@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+
 	"github.com/msgpack-rpc/msgpack-rpc-go/rpc"
 )
 
@@ -14,38 +15,40 @@ func (self Resolver) Resolve(name string, arguments []reflect.Value) (reflect.Va
 }
 
 func echo(test string) (string, fmt.Stringer) {
+	fmt.Println(test)
 	return "Hello, " + test, nil
 }
 
 func add(a, b uint) (uint, fmt.Stringer) {
+	fmt.Println("calling add on ", a, " and ", b)
 	return a + b, nil
 }
 
 func main() {
 	res := Resolver{"echo": reflect.ValueOf(echo), "add": reflect.ValueOf(add)}
 	serv := rpc.NewServer(res, true, nil)
-	l, err := net.Listen("tcp", "127.0.0.1:50000")
+	l, err := net.Listen("tcp", "127.0.0.1:5002")
 	serv.Listen(l)
-	go (func() { serv.Run() })()
+	serv.Run()
 
 	conn, err := net.Dial("tcp", "127.0.0.1:50000")
 	if err != nil {
-                fmt.Println("fail to connect to server.")
+		fmt.Println("fail to connect to server.")
 		return
 	}
 	client := rpc.NewSession(conn, true)
 
-        retval, xerr := client.Send("echo", "world")
-        if xerr != nil {
-                fmt.Println(xerr)
-                return
-        }
-        fmt.Println(retval.String())
+	retval, xerr := client.Send("echo", "world")
+	if xerr != nil {
+		fmt.Println(xerr)
+		return
+	}
+	fmt.Println(retval.String())
 
-        retval, xerr = client.Send("add", 2, 3)
-        if xerr != nil {
-                fmt.Println(xerr)
-                return
-        }
-        fmt.Println(rpc.CoerceInt(retval))
+	retval, xerr = client.Send("add", 2, 3)
+	if xerr != nil {
+		fmt.Println(xerr)
+		return
+	}
+	fmt.Println(rpc.CoerceInt(retval))
 }

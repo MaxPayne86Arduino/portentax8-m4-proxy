@@ -1,16 +1,16 @@
 package rpc
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"log"
-	msgpack "github.com/msgpack/msgpack-go"
 	"net"
 	"os"
 	"reflect"
-	"errors"
-)
 
+	msgpack "github.com/msgpack/msgpack-go"
+)
 
 type Server struct {
 	resolver     FunctionResolver
@@ -45,7 +45,7 @@ func (self *Server) Run() *Server {
 							self.log.Println(err)
 							break
 						}
-						msgId, funcName, _arguments, xerr := HandleRPCRequest(data)
+						msgId, funcName, _arguments, msgType, xerr := HandleRPCRequest(data)
 						if xerr != nil {
 							self.log.Println(xerr)
 							continue NextRequest
@@ -89,7 +89,9 @@ func (self *Server) Run() *Server {
 
 						retvals := f.Call(arguments)
 						if funcType.NumOut() == 1 {
-							SendResponseMessage(conn, msgId, retvals[0])
+							if msgType == REQUEST {
+								SendResponseMessage(conn, msgId, retvals[0])
+							}
 							continue NextRequest
 						}
 						var errMsg fmt.Stringer = nil
@@ -113,7 +115,9 @@ func (self *Server) Run() *Server {
 								retvals[0] = reflect.ValueOf([]byte(_retval.String()))
 							}
 						}
-						SendResponseMessage(conn, msgId, retvals[0])
+						if msgType == REQUEST {
+							SendResponseMessage(conn, msgId, retvals[0])
+						}
 					}
 					conn.Close()
 				})()
@@ -211,36 +215,46 @@ func NewServer(resolver FunctionResolver, autoCoercing bool, _log *log.Logger) *
 
 // This is a low-level function that is not supposed to be called directly
 // by the user.  Change this if the MessagePack protocol is updated.
-func HandleRPCRequest(req reflect.Value) (int, string, []reflect.Value, error) {
-	for{
+func HandleRPCRequest(req reflect.Value) (int, string, []reflect.Value, int, error) {
+	for {
 		_req, ok := req.Interface().([]reflect.Value)
 		if !ok {
-			break;
+			break
 		}
 		if len(_req) != 4 {
-			break;
+			fmt.Println(len(_req))
+			break
 		}
 		msgType := _req[0]
 		typeOk := msgType.Kind() == reflect.Int || msgType.Kind() == reflect.Int8 || msgType.Kind() == reflect.Int16 || msgType.Kind() == reflect.Int32 || msgType.Kind() == reflect.Int64
 		if !typeOk {
-			break;
+			fmt.Println("msgType")
+			fmt.Println(msgType)
+			break
 		}
 		msgId := _req[1]
-		idOk := msgId.Kind() == reflect.Int || msgId.Kind() == reflect.Int8 || msgId.Kind() == reflect.Int16 || msgId.Kind() == reflect.Int32 || msgId.Kind() == reflect.Int64
+		idOk := msgId.Kind() == reflect.Int || msgId.Kind() == reflect.Int8 || msgId.Kind() == reflect.Int16 || msgId.Kind() == reflect.Int32 || msgId.Kind() == reflect.Int64 || msgId.Kind() == reflect.Uint32
 		if !idOk {
-			break;
+			fmt.Println("msgId")
+			fmt.Println(msgId)
+			fmt.Println(msgId.Kind())
+			break
 		}
 		_funcName := _req[2]
 		funcOk := _funcName.Kind() == reflect.Array || _funcName.Kind() == reflect.Slice
 		if !funcOk {
-			break;
+			fmt.Println("_funcName")
+			fmt.Println(_funcName)
+			break
 		}
 		funcName, ok := _funcName.Interface().([]uint8)
 		if !ok {
-			break;
+			fmt.Println("funcName not ok")
+			break
 		}
-		if msgType.Int() != REQUEST {
-			break;
+		if msgType.Int() != REQUEST && msgType.Int() != NOTIFICATION {
+			fmt.Println(msgType.Int())
+			break
 		}
 		_arguments := _req[3]
 		var arguments []reflect.Value
@@ -256,14 +270,16 @@ func HandleRPCRequest(req reflect.Value) (int, string, []reflect.Value, error) {
 		} else {
 			arguments = []reflect.Value{_req[3]}
 		}
-		return int(msgId.Int()), string(funcName), arguments, nil
+		return int(msgId.Uint()), string(funcName), arguments, int(msgType.Int()), nil
 	}
-	return 0, "", nil, errors.New("Invalid message format")
+	return 0, "", nil, 0, errors.New("Invalid message format")
 }
 
 // This is a low-level function that is not supposed to be called directly
 // by the user.  Change this if the MessagePack protocol is updated.
 func SendResponseMessage(writer io.Writer, msgId int, value reflect.Value) error {
+	fmt.Println("sending response")
+
 	_, err := writer.Write([]byte{0x94})
 	if err != nil {
 		return err
