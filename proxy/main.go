@@ -40,7 +40,7 @@ func handleConnection(c net.Conn, chardev *os.File, resp chan []byte) {
 		// wait to be unlocked by the other reading goroutine
 		select {
 		case response := <-resp:
-			chardev.Read(response)
+			//chardev.Read(response)
 			c.Write(response)
 		}
 	}
