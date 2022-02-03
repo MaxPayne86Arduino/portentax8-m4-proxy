@@ -219,14 +219,14 @@ func chardevListener(chardev *os.File, resp chan []byte) {
 				// fire and forget
 			}
 
-			//conn.Close()
+			conn.Close()
 		}
 	}
 }
 
 func main() {
 
-	chardev, err := os.Open("/dev/x8h7_ui")
+	chardev, err := os.OpenFile("/dev/x8h7_ui", os.O_RDWR, 0)
 
 	chardev_reader_chan := make(chan []byte, 100)
 
