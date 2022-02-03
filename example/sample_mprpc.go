@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net"
+	"os"
 	"reflect"
 
 	"github.com/msgpack-rpc/msgpack-rpc-go/rpc"
@@ -11,6 +12,7 @@ import (
 type Resolver map[string]reflect.Value
 
 func (self Resolver) Resolve(name string, arguments []reflect.Value) (reflect.Value, error) {
+	fmt.Println("resolving ", name)
 	return self[name], nil
 }
 
@@ -24,31 +26,51 @@ func add(a, b uint) (uint, fmt.Stringer) {
 	return a + b, nil
 }
 
+func serialportListener(serport *os.File) {
+	for {
+		data := make([]byte, 1024)
+		n, err := serport.Read(data)
+
+		if err != nil {
+			fmt.Println(err)
+			continue
+		}
+
+		data = data[:n]
+
+		conn, err := net.Dial("tcp", ":5001")
+		client := rpc.NewSession(conn, true)
+		retval, xerr := client.Send("tty", data)
+		if xerr != nil {
+			fmt.Println(xerr)
+			continue
+		}
+		fmt.Println(retval.Int())
+	}
+}
+
+var serport *os.File
+
+func tty(test []reflect.Value) (int, fmt.Stringer) {
+	fmt.Println("tty called: ", test)
+	var temp []byte
+	for _, elem := range test {
+		temp = append(temp, byte(elem.Int()))
+	}
+	fmt.Println(temp)
+	serport.Write(temp)
+	return len(test), nil
+}
+
 func main() {
-	res := Resolver{"echo": reflect.ValueOf(echo), "add": reflect.ValueOf(add)}
+
+	serport, _ = os.OpenFile("/dev/ttyGS0", os.O_RDWR, 0)
+
+	go serialportListener(serport)
+
+	res := Resolver{"echo": reflect.ValueOf(echo), "add": reflect.ValueOf(add), "tty": reflect.ValueOf(tty)}
 	serv := rpc.NewServer(res, true, nil)
-	l, err := net.Listen("tcp", "127.0.0.1:5002")
+	l, _ := net.Listen("tcp", "127.0.0.1:5002")
 	serv.Listen(l)
 	serv.Run()
-
-	conn, err := net.Dial("tcp", "127.0.0.1:50000")
-	if err != nil {
-		fmt.Println("fail to connect to server.")
-		return
-	}
-	client := rpc.NewSession(conn, true)
-
-	retval, xerr := client.Send("echo", "world")
-	if xerr != nil {
-		fmt.Println(xerr)
-		return
-	}
-	fmt.Println(retval.String())
-
-	retval, xerr = client.Send("add", 2, 3)
-	if xerr != nil {
-		fmt.Println(xerr)
-		return
-	}
-	fmt.Println(rpc.CoerceInt(retval))
 }
