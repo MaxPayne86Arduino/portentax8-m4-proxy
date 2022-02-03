@@ -22,21 +22,46 @@ func handleConnection(c net.Conn, chardev *os.File, resp chan []byte) {
 
 	fmt.Printf("Serving %s\n", c.RemoteAddr().String())
 
-	data, _, err := msgpack.UnpackReflected(c)
+	data, _, err := msgpack.Unpack(c)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	_req, ok := data.Interface().([]reflect.Value)
-	if !ok {
-		return
-	}
-	msgType := _req[0]
+	fmt.Println(data)
+	var buf bytes.Buffer
 
-	chardev.Write(data.Bytes())
+	msgpack.Pack(&buf, data.Interface())
 
-	if msgType.Int() == REQUEST {
+	/*
+		msgId := _req[1]
+		msgName := _req[2]
+		msgArgs := _req[3]
+
+		rawdata := make([]byte, 5)
+		rawdata[0] = byte(msgType.Int())
+		rawdata[1] = byte(msgId.Int())
+		rawdata[2] = byte(msgId.Int())
+		rawdata[3] = byte(msgId.Int())
+		rawdata[4] = byte(msgId.Int())
+		rawdata = append(rawdata, msgName.Bytes()...)
+
+		something := msgArgs.Addr().Bytes()
+
+		fmt.Println(something)
+		rawdata = append(rawdata, something...)
+
+		fmt.Println(data)
+		fmt.Println(rawdata)
+	*/
+
+	fmt.Println(buf)
+
+	chardev.Write(buf.Bytes())
+
+	msgType := buf.Bytes()[0]
+
+	if msgType == REQUEST {
 		// wait to be unlocked by the other reading goroutine
 		select {
 		case response := <-resp:
@@ -45,7 +70,7 @@ func handleConnection(c net.Conn, chardev *os.File, resp chan []byte) {
 		}
 	}
 
-	if msgType.Int() == NOTIFICATION {
+	if msgType == NOTIFICATION {
 		// fire and forget
 	}
 
