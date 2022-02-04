@@ -278,7 +278,11 @@ func HandleRPCRequest(req reflect.Value) (int, string, []reflect.Value, int, err
 		} else {
 			arguments = []reflect.Value{_req[3]}
 		}
-		return int(msgId.Int()), string(funcName), arguments, int(msgType.Int()), nil
+		if msgId.Kind() == reflect.Uint || msgId.Kind() == reflect.Uint32 {
+			return int(msgId.Uint()), string(funcName), arguments, int(msgType.Int()), nil
+		} else {
+			return int(msgId.Int()), string(funcName), arguments, int(msgType.Int()), nil
+		}
 	}
 	return 0, "", nil, 0, errors.New("Invalid message format")
 }

@@ -52,12 +52,11 @@ func serialportListener(serport *os.File) {
 
 		conn, err := net.Dial("tcp", ":5001")
 		client := rpc.NewSession(conn, true)
-		retval, xerr := client.Send("tty", data)
+		_, xerr := client.Send("tty", data)
 		if xerr != nil {
 			fmt.Println(xerr)
 			continue
 		}
-		fmt.Println(retval.Int())
 	}
 }
 
