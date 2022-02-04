@@ -9,6 +9,8 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/msgpack-rpc/msgpack-rpc-go/rpc"
+
 	"github.com/facchinm/msgpack-go"
 )
 
@@ -171,6 +173,31 @@ func chardevListener(chardev *os.File, resp chan []byte) {
 	}
 }
 
+type Resolver map[string]reflect.Value
+
+func (self Resolver) Resolve(name string, arguments []reflect.Value) (reflect.Value, error) {
+	fmt.Println("resolving ", name)
+	return self[name], nil
+}
+
+func (self Resolver) Functions() []string {
+	var functions []string
+	for el := range self {
+		functions = append(functions, el)
+	}
+	return functions
+}
+
+func register(port uint, arg []reflect.Value) string {
+
+	var functions []string
+	for _, elem := range arg {
+		functions = append(functions, string(elem.Bytes()))
+	}
+	fmt.Println("Registering service on port ", port, " with functions ", functions)
+	return ""
+}
+
 func main() {
 
 	chardev, err := os.OpenFile("/dev/x8h7_ui", os.O_RDWR, 0)
@@ -185,6 +212,13 @@ func main() {
 	defer l.Close()
 
 	go chardevListener(chardev, chardev_reader_chan)
+
+	res := Resolver{"register": reflect.ValueOf(register)}
+
+	serv := rpc.NewServer(res, true, nil, 5000)
+	lx, _ := net.Listen("tcp", ":5000")
+	serv.Listen(lx)
+	go serv.Run()
 
 	for {
 		c, err := l.Accept()

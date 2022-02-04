@@ -16,6 +16,15 @@ func (self Resolver) Resolve(name string, arguments []reflect.Value) (reflect.Va
 	return self[name], nil
 }
 
+func (self Resolver) Functions() []string {
+	var functions []string
+	for el := range self {
+		functions = append(functions, el)
+	}
+	fmt.Println(functions)
+	return functions
+}
+
 func echo(test string) (string, fmt.Stringer) {
 	fmt.Println(test)
 	return "Hello, " + test, nil
@@ -80,8 +89,10 @@ func main() {
 	go serialportListener(serport)
 
 	res := Resolver{"echo": reflect.ValueOf(echo), "add": reflect.ValueOf(add), "tty": reflect.ValueOf(tty)}
-	serv := rpc.NewServer(res, true, nil)
+
+	serv := rpc.NewServer(res, true, nil, 5002)
 	l, _ := net.Listen("tcp", "127.0.0.1:5002")
 	serv.Listen(l)
+	serv.Register()
 	serv.Run()
 }

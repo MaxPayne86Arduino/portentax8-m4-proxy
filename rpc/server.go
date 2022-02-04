@@ -18,6 +18,14 @@ type Server struct {
 	listeners    []net.Listener
 	autoCoercing bool
 	lchan        chan int
+	port         uint
+}
+
+func (self *Server) Register() {
+	conn, _ := net.Dial("tcp", ":5000")
+	client := NewSession(conn, true)
+
+	client.Send("register", self.port, self.resolver.Functions())
 }
 
 // Goes into the event loop to get ready to serve.
@@ -206,11 +214,11 @@ func (self *Server) Listen(listener net.Listener) *Server {
 
 // Creates a new Server instance. raw bytesc are automatically converted into
 // strings if autoCoercing is enabled.
-func NewServer(resolver FunctionResolver, autoCoercing bool, _log *log.Logger) *Server {
+func NewServer(resolver FunctionResolver, autoCoercing bool, _log *log.Logger, port uint) *Server {
 	if _log == nil {
 		_log = log.New(os.Stderr, "msgpack: ", log.Ldate|log.Ltime)
 	}
-	return &Server{resolver, _log, make([]net.Listener, 0), autoCoercing, nil}
+	return &Server{resolver, _log, make([]net.Listener, 0), autoCoercing, nil, port}
 }
 
 // This is a low-level function that is not supposed to be called directly
