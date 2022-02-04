@@ -59,16 +59,20 @@ func handleConnection(c net.Conn, chardev *os.File, resp chan []byte) {
 
 	chardev.Write(buf.Bytes())
 
-	msgType := buf.Bytes()[0]
+	msgType := buf.Bytes()[1]
 
 	if msgType == REQUEST {
 		// wait to be unlocked by the other reading goroutine
+		// TODO: add timeout handling
+		fmt.Println("wait for response")
 		select {
 		case response := <-resp:
 			//chardev.Read(response)
+			fmt.Println("return response to client")
 			c.Write(response)
 		}
 	}
+	fmt.Println("done")
 
 	if msgType == NOTIFICATION {
 		// fire and forget
@@ -253,7 +257,7 @@ func main() {
 
 	chardev, err := os.OpenFile("/dev/x8h7_ui", os.O_RDWR, 0)
 
-	chardev_reader_chan := make(chan []byte, 100)
+	chardev_reader_chan := make(chan []byte, 1)
 
 	l, err := net.Listen("tcp4", ":5001")
 	if err != nil {

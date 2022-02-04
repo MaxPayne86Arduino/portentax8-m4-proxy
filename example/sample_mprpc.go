@@ -69,6 +69,14 @@ func main() {
 
 	serport, _ = os.OpenFile("/dev/ttyGS0", os.O_RDWR, 0)
 
+	conn, _ := net.Dial("tcp", ":5001")
+	client := rpc.NewSession(conn, true)
+	retval, xerr := client.Send("subtract", 35, 36)
+	if xerr != nil {
+		fmt.Println(xerr)
+	}
+	fmt.Println(retval.Int())
+
 	go serialportListener(serport)
 
 	res := Resolver{"echo": reflect.ValueOf(echo), "add": reflect.ValueOf(add), "tty": reflect.ValueOf(tty)}
