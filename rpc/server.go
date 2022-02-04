@@ -9,7 +9,7 @@ import (
 	"os"
 	"reflect"
 
-	msgpack "github.com/msgpack/msgpack-go"
+	msgpack "github.com/facchinm/msgpack-go"
 )
 
 type Server struct {
