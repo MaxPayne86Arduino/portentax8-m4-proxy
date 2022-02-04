@@ -1,12 +1,13 @@
 package rpc
 
 import (
+	"errors"
 	"fmt"
 	"io"
-	msgpack "github.com/msgpack/msgpack-go"
 	"net"
 	"reflect"
-	"errors"
+
+	msgpack "github.com/facchinm/msgpack-go"
 )
 
 type Session struct {
@@ -27,7 +28,6 @@ func coerce(arguments []interface{}) []interface{} {
 	}
 	return _arguments
 }
-
 
 // CoerceInt takes a reflected value and returns it as an int64
 // panics if not an integer type
@@ -141,36 +141,36 @@ func ReceiveResponse(reader io.Reader) (int, reflect.Value, error) {
 // This is a low-level function that is not supposed to be called directly
 // by the user.  Change this if the MessagePack protocol is updated.
 func HandleRPCResponse(req reflect.Value) (int, reflect.Value, error) {
-	for{
+	for {
 		_req, ok := req.Interface().([]reflect.Value)
 		if !ok {
-			break;
+			break
 		}
 		if len(_req) != 4 {
-			break;
+			break
 		}
 		msgType := _req[0]
 		typeOk := msgType.Kind() == reflect.Int || msgType.Kind() == reflect.Int8 || msgType.Kind() == reflect.Int16 || msgType.Kind() == reflect.Int32 || msgType.Kind() == reflect.Int64
 		if !typeOk {
-			break;
+			break
 		}
 		msgId := _req[1]
 		if msgId.Kind() != reflect.Int && msgId.Kind() != reflect.Int8 && msgId.Kind() != reflect.Int16 && msgId.Kind() != reflect.Int32 && msgId.Kind() != reflect.Int64 {
-			break;
+			break
 		}
 		if _req[2].IsValid() {
 			_errorMsg := _req[2]
 			if _errorMsg.Kind() != reflect.Array && _errorMsg.Kind() != reflect.Slice {
-                            break;
-                        }
-                        errorMsg, ok := _errorMsg.Interface().([]uint8)
-                        if !ok {
-                                break;
-                        }
-                        if msgType.Int() != RESPONSE {
-                                break;
-                        }
-                        if errorMsg != nil {
+				break
+			}
+			errorMsg, ok := _errorMsg.Interface().([]uint8)
+			if !ok {
+				break
+			}
+			if msgType.Int() != RESPONSE {
+				break
+			}
+			if errorMsg != nil {
 				return int(msgId.Int()), reflect.Value{}, errors.New(string(errorMsg))
 			}
 		}
