@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"reflect"
+	"strconv"
 	"time"
 
 	"github.com/msgpack-rpc/msgpack-rpc-go/rpc"
@@ -19,6 +20,8 @@ const (
 	RESPONSE     = 1
 	NOTIFICATION = 2
 )
+
+type Resolver map[string]reflect.Value
 
 func handleConnection(c net.Conn, chardev *os.File, resp chan []byte) {
 
@@ -83,7 +86,11 @@ func handleConnection(c net.Conn, chardev *os.File, resp chan []byte) {
 	c.Close()
 }
 
-func chardevListener(chardev *os.File, resp chan []byte) {
+func getPort(functions []string, target string) string {
+
+}
+
+func chardevListener(chardev *os.File, resp chan []byte, resolver *Resolver) {
 
 	for {
 
@@ -136,8 +143,11 @@ func chardevListener(chardev *os.File, resp chan []byte) {
 				break
 			}
 
+			msgFunction := _req[1]
+			port := resolver.FunctionToPort(msgFunction.String())
+
 			// REQUEST or NOTIFICATION
-			conn, err := net.Dial("tcp", ":5002")
+			conn, err := net.Dial("tcp", port)
 			if err != nil {
 				fmt.Println(err)
 				break
@@ -173,32 +183,28 @@ func chardevListener(chardev *os.File, resp chan []byte) {
 	}
 }
 
-type Resolver map[string]reflect.Value
-
 func (self Resolver) Resolve(name string, arguments []reflect.Value) (reflect.Value, error) {
 	fmt.Println("resolving ", name)
 	return self[name], nil
 }
 
-func (self Resolver) Functions() []string {
-	var functions []string
-	for el := range self {
-		functions = append(functions, el)
-	}
-	return functions
+var functions map[string]int
+
+func (self Resolver) FunctionToPort(function string) string {
+	return ":" + strconv.Itoa(functions[function])
 }
 
 func register(port uint, arg []reflect.Value) string {
-
-	var functions []string
 	for _, elem := range arg {
-		functions = append(functions, string(elem.Bytes()))
+		functions[string(elem.Bytes())] = int(port)
 	}
 	fmt.Println("Registering service on port ", port, " with functions ", functions)
 	return ""
 }
 
 func main() {
+
+	functions = make(map[string]int)
 
 	chardev, err := os.OpenFile("/dev/x8h7_ui", os.O_RDWR, 0)
 
@@ -211,9 +217,9 @@ func main() {
 	}
 	defer l.Close()
 
-	go chardevListener(chardev, chardev_reader_chan)
-
 	res := Resolver{"register": reflect.ValueOf(register)}
+
+	go chardevListener(chardev, chardev_reader_chan, &res)
 
 	serv := rpc.NewServer(res, true, nil, 5000)
 	lx, _ := net.Listen("tcp", ":5000")
