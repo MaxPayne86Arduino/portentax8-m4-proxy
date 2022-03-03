@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/exec"
 	"reflect"
 
 	"github.com/msgpack-rpc/msgpack-rpc-go/rpc"
@@ -28,6 +29,11 @@ func (self Resolver) Functions() []string {
 func echo(test string) (string, fmt.Stringer) {
 	fmt.Println(test)
 	return "Hello, " + test, nil
+}
+
+func whoami() (string, fmt.Stringer) {
+	out, _ := exec.Command("whoami").Output()
+	return string(out), nil
 }
 
 func add(a, b uint) (uint, fmt.Stringer) {
@@ -87,7 +93,7 @@ func main() {
 
 	go serialportListener(serport)
 
-	res := Resolver{"echo": reflect.ValueOf(echo), "add": reflect.ValueOf(add), "tty": reflect.ValueOf(tty)}
+	res := Resolver{"echo": reflect.ValueOf(echo), "add": reflect.ValueOf(add), "tty": reflect.ValueOf(tty), "whoami": reflect.ValueOf(whoami)}
 
 	serv := rpc.NewServer(res, true, nil, 5002)
 	l, _ := net.Listen("tcp", "127.0.0.1:5002")

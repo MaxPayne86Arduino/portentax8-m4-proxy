@@ -139,8 +139,10 @@ func chardevListener(chardev *os.File, resp chan []byte) {
 				break
 			}
 
-			msgFunction := _req[1]
-			port := functionToPort(msgFunction.String())
+			msgFunction := _req[2]
+			port := functionToPort(string(msgFunction.Bytes()))
+
+			fmt.Println("Serving function ", string(msgFunction.Bytes()), " to port ", port)
 
 			// REQUEST or NOTIFICATION
 			conn, err := net.Dial("tcp", port)
