@@ -12,5 +12,5 @@ const (
 
 type FunctionResolver interface {
 	Resolve(name string, arguments []reflect.Value) (reflect.Value, error)
-	FunctionToPort() (port string)
+	Functions() (functions []string)
 }

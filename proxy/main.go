@@ -86,11 +86,7 @@ func handleConnection(c net.Conn, chardev *os.File, resp chan []byte) {
 	c.Close()
 }
 
-func getPort(functions []string, target string) string {
-
-}
-
-func chardevListener(chardev *os.File, resp chan []byte, resolver *Resolver) {
+func chardevListener(chardev *os.File, resp chan []byte) {
 
 	for {
 
@@ -144,7 +140,7 @@ func chardevListener(chardev *os.File, resp chan []byte, resolver *Resolver) {
 			}
 
 			msgFunction := _req[1]
-			port := resolver.FunctionToPort(msgFunction.String())
+			port := functionToPort(msgFunction.String())
 
 			// REQUEST or NOTIFICATION
 			conn, err := net.Dial("tcp", port)
@@ -188,9 +184,18 @@ func (self Resolver) Resolve(name string, arguments []reflect.Value) (reflect.Va
 	return self[name], nil
 }
 
+func (self Resolver) Functions() []string {
+	var functions []string
+	for el := range self {
+		functions = append(functions, el)
+	}
+	fmt.Println(functions)
+	return functions
+}
+
 var functions map[string]int
 
-func (self Resolver) FunctionToPort(function string) string {
+func functionToPort(function string) string {
 	return ":" + strconv.Itoa(functions[function])
 }
 
@@ -219,7 +224,7 @@ func main() {
 
 	res := Resolver{"register": reflect.ValueOf(register)}
 
-	go chardevListener(chardev, chardev_reader_chan, &res)
+	go chardevListener(chardev, chardev_reader_chan)
 
 	serv := rpc.NewServer(res, true, nil, 5000)
 	lx, _ := net.Listen("tcp", ":5000")
