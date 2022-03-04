@@ -75,6 +75,8 @@ func handleConnection(c net.Conn, chardev *os.File, resp chan []byte) {
 			//chardev.Read(response)
 			fmt.Println("return response to client")
 			c.Write(response)
+		case <-time.After(1 * time.Second):
+			c.Write(nil)
 		}
 	}
 	fmt.Println("done")
@@ -89,6 +91,8 @@ func handleConnection(c net.Conn, chardev *os.File, resp chan []byte) {
 func chardevListener(chardev *os.File, resp chan []byte) {
 
 	for {
+
+		fmt.Println("charDevListener")
 
 		data := make([]byte, 1024)
 		response := make([]byte, 1024)
@@ -113,9 +117,13 @@ func chardevListener(chardev *os.File, resp chan []byte) {
 		start := 0
 		for {
 
+			fmt.Println("unpacker loop")
+
 			copy_data := data[start:]
 
 			message, n, err := msgpack.UnpackReflected(bytes.NewReader(copy_data))
+
+			start += n
 
 			fmt.Printf("%d bytes consumed\n", n)
 			fmt.Printf("%v\n", message)
@@ -128,16 +136,21 @@ func chardevListener(chardev *os.File, resp chan []byte) {
 
 			_req, ok := message.Interface().([]reflect.Value)
 			if !ok {
-				break
+				continue
 			}
 
 			msgType := _req[0]
 
+			fmt.Println("before response")
+
 			if msgType.Int() == RESPONSE {
+				fmt.Println("got response and continue")
 				// unlock thread waiting on handleConnection
 				resp <- copy_data[:n]
-				break
+				continue
 			}
+
+			fmt.Println("before serving")
 
 			msgFunction := _req[2]
 			port := functionToPort(string(msgFunction.Bytes()))
@@ -148,11 +161,9 @@ func chardevListener(chardev *os.File, resp chan []byte) {
 			conn, err := net.Dial("tcp", port)
 			if err != nil {
 				fmt.Println(err)
-				break
+				continue
 			}
 			conn.Write(copy_data[:n])
-
-			start += n
 
 			if msgType.Int() == REQUEST {
 				fmt.Println("ask for a response")
@@ -215,7 +226,7 @@ func main() {
 
 	chardev, err := os.OpenFile("/dev/x8h7_ui", os.O_RDWR, 0)
 
-	chardev_reader_chan := make(chan []byte, 1)
+	chardev_reader_chan := make(chan []byte, 1024)
 
 	l, err := net.Listen("tcp4", ":5001")
 	if err != nil {

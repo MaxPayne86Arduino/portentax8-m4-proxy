@@ -58,6 +58,20 @@ func CoerceUint(v reflect.Value) uint64 {
 	panic("not integer type")
 }
 
+// Sends a RPC notification to the server.
+func (self *Session) SendN(funcName string, arguments []interface{}) error {
+	var msgId = self.nextId
+	self.nextId += 1
+	if self.autoCoercing {
+		arguments = coerce(arguments)
+	}
+	err := SendNotificationMessage(self.conn.(io.Writer), msgId, funcName, arguments)
+	if err != nil {
+		return errors.New("Failed to send a request message: " + err.Error())
+	}
+	return nil
+}
+
 // Sends a RPC request to the server.
 func (self *Session) SendV(funcName string, arguments []interface{}) (reflect.Value, error) {
 	var msgId = self.nextId
@@ -89,8 +103,13 @@ func (self *Session) SendV(funcName string, arguments []interface{}) (reflect.Va
 }
 
 // Sends a RPC request to the server.
-func (self *Session) Send(funcName string, arguments ...interface{}) (reflect.Value, error) {
+func (self *Session) Call(funcName string, arguments ...interface{}) (reflect.Value, error) {
 	return self.SendV(funcName, arguments)
+}
+
+// Sends a RPC request to the server.
+func (self *Session) Send(funcName string, arguments ...interface{}) error {
+	return self.SendN(funcName, arguments)
 }
 
 // Creates a new session with the specified connection.  Strings are
@@ -98,6 +117,29 @@ func (self *Session) Send(funcName string, arguments ...interface{}) (reflect.Va
 // enabled.
 func NewSession(conn net.Conn, autoCoercing bool) *Session {
 	return &Session{conn, autoCoercing, 1}
+}
+
+// This is a low-level function that is not supposed to be called directly
+// by the user.  Change this if the MessagePack protocol is updated.
+func SendNotificationMessage(writer io.Writer, msgId int, funcName string, arguments []interface{}) error {
+	_, err := writer.Write([]byte{0x94})
+	if err != nil {
+		return err
+	}
+	_, err = msgpack.PackInt(writer, NOTIFICATION)
+	if err != nil {
+		return err
+	}
+	_, err = msgpack.PackInt(writer, msgId)
+	if err != nil {
+		return err
+	}
+	_, err = msgpack.PackBytes(writer, []byte(funcName))
+	if err != nil {
+		return err
+	}
+	_, err = msgpack.PackArray(writer, reflect.ValueOf(arguments))
+	return err
 }
 
 // This is a low-level function that is not supposed to be called directly
