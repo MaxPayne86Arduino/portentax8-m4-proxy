@@ -3,7 +3,7 @@
 
 import msgpackrpc
 
-client = msgpackrpc.Client(msgpackrpc.Address("localhost", 5000))
+client = msgpackrpc.Client(msgpackrpc.Address("m4-proxy", 5000))
 result = client.call('register', 5005, ['multiply', 'divide'])
 
 class Server(object):

@@ -56,7 +56,7 @@ func serialportListener(serport *os.File) {
 		data = data[:n]
 		fmt.Println(data)
 
-		conn, err := net.Dial("tcp", ":5001")
+		conn, err := net.Dial("tcp", "m4-proxy:5001")
 		client := rpc.NewSession(conn, true)
 		xerr := client.Send("tty", data)
 		if xerr != nil {
@@ -88,7 +88,7 @@ func main() {
 	res := Resolver{"echo": reflect.ValueOf(echo), "add": reflect.ValueOf(add), "tty": reflect.ValueOf(tty), "whoami": reflect.ValueOf(whoami)}
 
 	serv := rpc.NewServer(res, true, nil, 5002)
-	l, _ := net.Listen("tcp", "127.0.0.1:5002")
+	l, _ := net.Listen("tcp", ":5002")
 	serv.Listen(l)
 	serv.Register()
 	serv.Run()

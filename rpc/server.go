@@ -22,7 +22,7 @@ type Server struct {
 }
 
 func (self *Server) Register() {
-	conn, _ := net.Dial("tcp", ":5000")
+	conn, _ := net.Dial("tcp", "m4-proxy:5000")
 	client := NewSession(conn, true)
 
 	client.Send("register", self.port, self.resolver.Functions())
