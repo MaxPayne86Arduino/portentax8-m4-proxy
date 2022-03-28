@@ -128,7 +128,9 @@ func chardevListener(chardev *os.File, resp chan []byte) {
 			fmt.Printf("%d bytes consumed\n", n)
 			fmt.Printf("%v\n", message)
 			fmt.Println(message)
-			fmt.Println(err)
+			if err != nil {
+				fmt.Printf("Err: %v\n", err)
+			}
 
 			if err == io.EOF {
 				break
@@ -139,23 +141,33 @@ func chardevListener(chardev *os.File, resp chan []byte) {
 				continue
 			}
 
-			msgType := _req[0]
+			msgType := _req[0].Int()
+			fmt.Printf("MsgType: %d\n", msgType)
 
 			fmt.Println("before response")
 
-			if msgType.Int() == RESPONSE {
+			if msgType == RESPONSE {
 				fmt.Println("got response and continue")
 				// unlock thread waiting on handleConnection
 				resp <- copy_data[:n]
 				continue
 			}
 
+			var msgFunction reflect.Value
+
+			if msgType == REQUEST {
+				msgFunction = _req[2]
+			}
+
+			if msgType == NOTIFICATION {
+				msgFunction = _req[1]
+			}
+
 			fmt.Println("before serving")
+			method := string(msgFunction.Bytes())
+			port := functionToPort(method)
 
-			msgFunction := _req[2]
-			port := functionToPort(string(msgFunction.Bytes()))
-
-			fmt.Println("Serving function ", string(msgFunction.Bytes()), " to port ", port)
+			fmt.Println("Serving function ", method, " to port ", port)
 
 			// REQUEST or NOTIFICATION
 			conn, err := net.Dial("tcp", port)
@@ -165,7 +177,7 @@ func chardevListener(chardev *os.File, resp chan []byte) {
 			}
 			conn.Write(copy_data[:n])
 
-			if msgType.Int() == REQUEST {
+			if msgType == REQUEST {
 				fmt.Println("ask for a response")
 
 				var to_send []byte
@@ -183,7 +195,8 @@ func chardevListener(chardev *os.File, resp chan []byte) {
 				chardev.Write(to_send[:i])
 			}
 
-			if msgType.Int() == NOTIFICATION {
+			if msgType == NOTIFICATION {
+				fmt.Println("got a notification")
 				// fire and forget
 			}
 
