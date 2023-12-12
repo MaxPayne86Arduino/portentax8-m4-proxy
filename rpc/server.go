@@ -25,7 +25,7 @@ func (self *Server) Register() {
 	conn, _ := net.Dial("tcp", "m4-proxy:5000")
 	client := NewSession(conn, true)
 
-	client.Send("register", self.port, self.resolver.Functions())
+	client.Call("register", self.port, self.resolver.Functions())
 }
 
 // Goes into the event loop to get ready to serve.
@@ -229,26 +229,31 @@ func HandleRPCRequest(req reflect.Value) (int, string, []reflect.Value, int, err
 		if !ok {
 			break
 		}
-		if len(_req) != 4 {
-			fmt.Println(len(_req))
+		index := 0
+		if len(_req) > 4 && len(_req) < 3 {
 			break
 		}
-		msgType := _req[0]
+		msgType := _req[index]
 		typeOk := msgType.Kind() == reflect.Int || msgType.Kind() == reflect.Int8 || msgType.Kind() == reflect.Int16 || msgType.Kind() == reflect.Int32 || msgType.Kind() == reflect.Int64
 		if !typeOk {
 			fmt.Println("msgType")
 			fmt.Println(msgType)
 			break
 		}
-		msgId := _req[1]
-		idOk := msgId.Kind() == reflect.Int || msgId.Kind() == reflect.Int8 || msgId.Kind() == reflect.Int16 || msgId.Kind() == reflect.Int32 || msgId.Kind() == reflect.Int64 || msgId.Kind() == reflect.Uint32
-		if !idOk {
-			fmt.Println("msgId")
-			fmt.Println(msgId)
-			fmt.Println(msgId.Kind())
-			break
+		index++
+		var msgId reflect.Value
+		if msgType.Int() == REQUEST {
+			msgId = _req[index]
+			idOk := msgId.Kind() == reflect.Int || msgId.Kind() == reflect.Int8 || msgId.Kind() == reflect.Int16 || msgId.Kind() == reflect.Int32 || msgId.Kind() == reflect.Int64 || msgId.Kind() == reflect.Uint32
+			if !idOk {
+				fmt.Println("msgId")
+				fmt.Println(msgId)
+				fmt.Println(msgId.Kind())
+				break
+			}
+			index++
 		}
-		_funcName := _req[2]
+		_funcName := _req[index]
 		funcOk := _funcName.Kind() == reflect.Array || _funcName.Kind() == reflect.Slice
 		if !funcOk {
 			fmt.Println("_funcName")
@@ -261,27 +266,29 @@ func HandleRPCRequest(req reflect.Value) (int, string, []reflect.Value, int, err
 			break
 		}
 		if msgType.Int() != REQUEST && msgType.Int() != NOTIFICATION {
-			fmt.Println(msgType.Int())
 			break
 		}
-		_arguments := _req[3]
+		index++
+		_arguments := _req[index]
 		var arguments []reflect.Value
 		if _arguments.Kind() == reflect.Array || _arguments.Kind() == reflect.Slice {
-			elemType := _req[3].Type().Elem()
+			elemType := _req[index].Type().Elem()
 			_elemType := elemType
-			ok := _elemType.Kind() == reflect.Uint || _elemType.Kind() == reflect.Uint8 || _elemType.Kind() == reflect.Uint16 || _elemType.Kind() == reflect.Uint32 || _elemType.Kind() == reflect.Uint64 || _elemType.Kind() == reflect.Uintptr
+			ok := isUintType(_elemType)
 			if !ok || _elemType.Kind() != reflect.Uint8 {
 				arguments, ok = _arguments.Interface().([]reflect.Value)
 			} else {
-				arguments = []reflect.Value{reflect.ValueOf(string(_req[3].Interface().([]byte)))}
+				arguments = []reflect.Value{reflect.ValueOf(string(_req[index].Interface().([]byte)))}
 			}
 		} else {
-			arguments = []reflect.Value{_req[3]}
+			arguments = []reflect.Value{_req[index]}
 		}
-		if msgId.Kind() == reflect.Uint || msgId.Kind() == reflect.Uint32 {
+		if isUintType(msgId) {
 			return int(msgId.Uint()), string(funcName), arguments, int(msgType.Int()), nil
-		} else {
+		} else if isIntType(msgId) {
 			return int(msgId.Int()), string(funcName), arguments, int(msgType.Int()), nil
+		} else {
+			return int(0), string(funcName), arguments, int(msgType.Int()), nil
 		}
 	}
 	return 0, "", nil, 0, errors.New("Invalid message format")
@@ -290,7 +297,6 @@ func HandleRPCRequest(req reflect.Value) (int, string, []reflect.Value, int, err
 // This is a low-level function that is not supposed to be called directly
 // by the user.  Change this if the MessagePack protocol is updated.
 func SendResponseMessage(writer io.Writer, msgId int, value reflect.Value) error {
-	fmt.Println("sending response")
 
 	_, err := writer.Write([]byte{0x94})
 	if err != nil {

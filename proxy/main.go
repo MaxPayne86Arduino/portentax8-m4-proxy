@@ -24,44 +24,15 @@ const (
 type Resolver map[string]reflect.Value
 
 func handleConnection(c net.Conn, chardev *os.File, resp chan []byte) {
-
-	fmt.Printf("Serving %s\n", c.RemoteAddr().String())
-
 	data, _, err := msgpack.Unpack(c)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	fmt.Println(data)
 	var buf bytes.Buffer
 
 	msgpack.Pack(&buf, data.Interface())
-
-	/*
-		msgId := _req[1]
-		msgName := _req[2]
-		msgArgs := _req[3]
-
-		rawdata := make([]byte, 5)
-		rawdata[0] = byte(msgType.Int())
-		rawdata[1] = byte(msgId.Int())
-		rawdata[2] = byte(msgId.Int())
-		rawdata[3] = byte(msgId.Int())
-		rawdata[4] = byte(msgId.Int())
-		rawdata = append(rawdata, msgName.Bytes()...)
-
-		something := msgArgs.Addr().Bytes()
-
-		fmt.Println(something)
-		rawdata = append(rawdata, something...)
-
-		fmt.Println(data)
-		fmt.Println(rawdata)
-	*/
-
-	fmt.Println(buf)
-
 	chardev.Write(buf.Bytes())
 
 	msgType := buf.Bytes()[1]
@@ -69,18 +40,14 @@ func handleConnection(c net.Conn, chardev *os.File, resp chan []byte) {
 	if msgType == REQUEST {
 		// wait to be unlocked by the other reading goroutine
 		// TODO: add timeout handling
-		fmt.Println("wait for response")
 		select {
 		case response := <-resp:
 			//chardev.Read(response)
-			fmt.Println("return response to client")
 			c.Write(response)
 		case <-time.After(1 * time.Second):
 			c.Write(nil)
 		}
 	}
-	fmt.Println("done")
-
 	if msgType == NOTIFICATION {
 		// fire and forget
 	}
@@ -91,9 +58,6 @@ func handleConnection(c net.Conn, chardev *os.File, resp chan []byte) {
 func chardevListener(chardev *os.File, resp chan []byte) {
 
 	for {
-
-		fmt.Println("charDevListener")
-
 		data := make([]byte, 1024)
 		response := make([]byte, 1024)
 
@@ -102,36 +66,16 @@ func chardevListener(chardev *os.File, resp chan []byte) {
 		data = data[:n]
 
 		if err != nil {
-			fmt.Println(err)
 			continue
 		}
-		fmt.Println("chardev.Read returned")
-
 		if n <= 0 {
 			continue
 		}
-
-		fmt.Println("got data from chardev")
-		fmt.Println(data)
-
 		start := 0
 		for {
-
-			fmt.Println("unpacker loop")
-
 			copy_data := data[start:]
-
 			message, n, err := msgpack.UnpackReflected(bytes.NewReader(copy_data))
-
 			start += n
-
-			fmt.Printf("%d bytes consumed\n", n)
-			fmt.Printf("%v\n", message)
-			fmt.Println(message)
-			if err != nil {
-				fmt.Printf("Err: %v\n", err)
-			}
-
 			if err == io.EOF {
 				break
 			}
@@ -142,12 +86,8 @@ func chardevListener(chardev *os.File, resp chan []byte) {
 			}
 
 			msgType := _req[0].Int()
-			fmt.Printf("MsgType: %d\n", msgType)
-
-			fmt.Println("before response")
 
 			if msgType == RESPONSE {
-				fmt.Println("got response and continue")
 				// unlock thread waiting on handleConnection
 				resp <- copy_data[:n]
 				continue
@@ -163,23 +103,21 @@ func chardevListener(chardev *os.File, resp chan []byte) {
 				msgFunction = _req[1]
 			}
 
-			fmt.Println("before serving")
 			method := string(msgFunction.Bytes())
 			port := functionToPort(method)
-
-			fmt.Println("Serving function ", method, " to port ", port)
 
 			// REQUEST or NOTIFICATION
 			conn, err := net.Dial("tcp", port)
 			if err != nil {
+				continue
+			}
+			_, err = conn.Write(copy_data[:n])
+			if err != nil {
 				fmt.Println(err)
 				continue
 			}
-			conn.Write(copy_data[:n])
 
 			if msgType == REQUEST {
-				fmt.Println("ask for a response")
-
 				var to_send []byte
 				i := 0
 				for {
@@ -191,12 +129,10 @@ func chardevListener(chardev *os.File, resp chan []byte) {
 						break
 					}
 				}
-				fmt.Println("sending ", to_send[:i])
 				chardev.Write(to_send[:i])
 			}
 
 			if msgType == NOTIFICATION {
-				fmt.Println("got a notification")
 				// fire and forget
 			}
 
@@ -206,7 +142,6 @@ func chardevListener(chardev *os.File, resp chan []byte) {
 }
 
 func (self Resolver) Resolve(name string, arguments []reflect.Value) (reflect.Value, error) {
-	fmt.Println("resolving ", name)
 	return self[name], nil
 }
 
@@ -215,7 +150,6 @@ func (self Resolver) Functions() []string {
 	for el := range self {
 		functions = append(functions, el)
 	}
-	fmt.Println(functions)
 	return functions
 }
 
