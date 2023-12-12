@@ -68,13 +68,24 @@ func tty(test []reflect.Value) fmt.Stringer {
 	return nil
 }
 
+func led(status uint) fmt.Stringer {
+	conn, _ := net.Dial("tcp", "m4-proxy:5001")
+	client := rpc.NewSession(conn, true)
+	xerr := client.Send("led", status)
+	if xerr != nil {
+		fmt.Println(xerr)
+	}
+	return nil
+}
+
 func main() {
 
+	exec.Command("stty", "-F", "/dev/ttyGS0", "raw")
 	serport, _ = os.OpenFile("/dev/ttyGS0", os.O_RDWR, 0)
 
 	go serialportListener(serport)
 
-	res := Resolver{"echo": reflect.ValueOf(echo), "add": reflect.ValueOf(add), "tty": reflect.ValueOf(tty), "whoami": reflect.ValueOf(whoami)}
+	res := Resolver{"echo": reflect.ValueOf(echo), "add": reflect.ValueOf(add), "tty": reflect.ValueOf(tty), "whoami": reflect.ValueOf(whoami), "led": reflect.ValueOf(led)}
 
 	serv := rpc.NewServer(res, true, nil, 5002)
 	l, _ := net.Listen("tcp", ":5002")
