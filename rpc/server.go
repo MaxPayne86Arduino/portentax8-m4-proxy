@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/exec"
 	"reflect"
 
 	msgpack "github.com/facchinm/msgpack-go"
@@ -21,8 +22,18 @@ type Server struct {
 	port         uint
 }
 
+var proxyname string = "m4-proxy"
+
 func (self *Server) Register() {
-	conn, _ := net.Dial("tcp", "m4-proxy:5000")
+
+	// if Proxy is started outside a container, m4-proxy will be localhost
+	// ping m4-proxy, if failed then m4-proxy is localhost
+	// if ping success, then m4-proxy is m4-proxy
+	if err := exec.Command("ping", "-c", "1", proxyname).Run(); err != nil {
+		fmt.Println("Proxy is localhost")
+		proxyname = "localhost"
+	}
+	conn, _ := net.Dial("tcp", proxyname+":5000")
 	client := NewSession(conn, true)
 
 	client.Call("register", self.port, self.resolver.Functions())
