@@ -172,6 +172,10 @@ func main() {
 	functions = make(map[string]int)
 
 	chardev, err := os.OpenFile("/dev/x8h7_ui", os.O_RDWR, 0)
+	if (err != nil) {
+		fmt.Println(err)
+		return
+	}
 
 	chardev_reader_chan := make(chan []byte, 1024)
 
