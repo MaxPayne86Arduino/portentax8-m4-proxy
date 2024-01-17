@@ -13,7 +13,6 @@ import (
 type Resolver map[string]reflect.Value
 
 func (self Resolver) Resolve(name string, arguments []reflect.Value) (reflect.Value, error) {
-	//fmt.Println("resolving ", name)
 	return self[name], nil
 }
 
@@ -22,12 +21,10 @@ func (self Resolver) Functions() []string {
 	for el := range self {
 		functions = append(functions, el)
 	}
-	fmt.Println(functions)
 	return functions
 }
 
 func echo(test string) (string, fmt.Stringer) {
-	fmt.Println(test)
 	return "Hello, " + test, nil
 }
 
@@ -37,9 +34,10 @@ func whoami() (string, fmt.Stringer) {
 }
 
 func add(a, b uint) (uint, fmt.Stringer) {
-	fmt.Println("calling add on ", a, " and ", b)
 	return a + b, nil
 }
+
+var proxyname string = "m4-proxy"
 
 func serialportListener(serport *os.File) {
 	for {
@@ -47,20 +45,15 @@ func serialportListener(serport *os.File) {
 		n, err := serport.Read(data)
 
 		if err != nil {
-			fmt.Println(err)
 			continue
 		}
 
-		fmt.Println("got data on serial port")
-
 		data = data[:n]
-		fmt.Println(data)
 
-		conn, err := net.Dial("tcp", "m4-proxy:5001")
+		conn, err := net.Dial("tcp", proxyname+":5001")
 		client := rpc.NewSession(conn, true)
 		xerr := client.Send("tty", data)
 		if xerr != nil {
-			fmt.Println(xerr)
 			continue
 		}
 	}
@@ -69,23 +62,42 @@ func serialportListener(serport *os.File) {
 var serport *os.File
 
 func tty(test []reflect.Value) fmt.Stringer {
-	fmt.Println("tty called: ", test)
 	var temp []byte
 	for _, elem := range test {
 		temp = append(temp, byte(elem.Int()))
 	}
-	//fmt.Println(temp)
 	serport.Write(temp)
+	return nil
+}
+
+func led(status uint) fmt.Stringer {
+	conn, _ := net.Dial("tcp", proxyname+":5001")
+	client := rpc.NewSession(conn, true)
+	xerr := client.Send("led", status)
+	if xerr != nil {
+		fmt.Println(xerr)
+	}
 	return nil
 }
 
 func main() {
 
+	exec.Command("stty", "-F", "/dev/ttyGS0", "raw")
 	serport, _ = os.OpenFile("/dev/ttyGS0", os.O_RDWR, 0)
+
+	// if Proxy is started outside a container, m4-proxy will be localhost
+	// ping m4-proxy, if failed then m4-proxy is localhost
+	// if ping success, then m4-proxy is m4-proxy
+	if err := exec.Command("ping", "-c", "1", proxyname).Run(); err != nil {
+		fmt.Println("Proxy is localhost")
+		proxyname = "localhost"
+	}
+
+	// serialportListener listens to the serial port and forwards the data to the proxy
 
 	go serialportListener(serport)
 
-	res := Resolver{"echo": reflect.ValueOf(echo), "add": reflect.ValueOf(add), "tty": reflect.ValueOf(tty), "whoami": reflect.ValueOf(whoami)}
+	res := Resolver{"echo": reflect.ValueOf(echo), "add": reflect.ValueOf(add), "tty": reflect.ValueOf(tty), "whoami": reflect.ValueOf(whoami), "led": reflect.ValueOf(led)}
 
 	serv := rpc.NewServer(res, true, nil, 5002)
 	l, _ := net.Listen("tcp", ":5002")
