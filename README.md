@@ -27,9 +27,9 @@ minicom -D /dev/ttyACM0
 #### How-to-debug
 **Note**: the [`proxy`](proxy/main.go) is built into the Yocto image via this [recipe](https://github.com/arduino/meta-partner-arduino/blob/main/recipes-connectivity/m4-proxy/m4-proxy.bb). Should it become necessary to debug and build a custom version you can also build it on your PC and then push and execute it on the Portenta X8.
 ```bash
-cd example
+cd proxy
 GOOS=linux GOARCH=arm64 go build
-adb push example /home/fio
+adb push proxy /home/fio
 ```
 Before starting the locally built proxy make sure that the one automatically started as a service is disabled.
 ```bash
