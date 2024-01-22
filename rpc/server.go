@@ -216,7 +216,7 @@ func (self *Server) Stop() *Server {
 	return self
 }
 
-// Listenes on the specified transport.  A single server can listen on the
+// Listens on the specified transport.  A single server can listen on the
 // multiple ports.
 func (self *Server) Listen(listener net.Listener) *Server {
 	self.listeners = append(self.listeners, listener)
