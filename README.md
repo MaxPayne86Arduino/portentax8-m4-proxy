@@ -1,5 +1,7 @@
 `portentax8-m4-proxy`
 =====================
+[![Spell Check](https://github.com/arduino/portentax8-m4-proxy/actions/workflows/spell-check.yml/badge.svg)](https://github.com/arduino/portentax8-m4-proxy/actions/workflows/spell-check.yml)
+
 #### How-to-use 
 * Compile and upload [`PortentaX8_EchoServer`](https://github.com/arduino/ArduinoCore-mbed/blob/main/libraries/RPC/examples/PortentaX8_EchoServer/PortentaX8_EchoServer.ino)
 ```bash
